@@ -17,7 +17,7 @@ def top_k_logits(logits, k):
     return out
 
 @torch.no_grad()
-def sample(model, x, y0, z, steps):
+def sample(model, x, y0, label, len_mask, steps):
     """
     take a conditioning sequence of indices in x (of shape (b,t)) and predict the next token in
     the sequence, feeding the predictions back into the model each time. Clearly the sampling
@@ -27,11 +27,27 @@ def sample(model, x, y0, z, steps):
     block_size = model.get_block_size()
     model.eval()
     generated = []
+ 
+    #print("x >>>>>>>>>>:", x)
+    y1 = y0
+    reps = model.representation(x, label)
+    #print(reps)
+
     for k in range(steps):
         
-        x_cond = x if x.size(1) <= block_size else x[:, -block_size:] # crop context if needed
-        logits, _, pred = model(x_cond, y0, z)
-        logits = logits[:, y0.shape[1]-1, :]
+        #print("****************", y0)
+        logits, _, pred = model.decode(reps, y0, None)
+        #logits, _, pred = model(x, y0, None, label)
+        
+        #for j in range(len(y0[0])):
+        #    y2 = torch.argmax(logits[:, j, :], dim=1)
+        #    print("&&&&&&&&&&&&&&&&", y2)
+
+
+        logits = logits[:, len(y0)-1, :]
+
+        
+        #logits[:, y1] = float('-inf')
         y1 = torch.argmax(logits,dim=1).unsqueeze(0)
         #print(y1.item())
         generated.append(y1.item())

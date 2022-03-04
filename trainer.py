@@ -42,8 +42,6 @@ class Trainer:
         self.config = config
         self.word_2_id = word_2_id
         self.id_2_word = id_2_word
-        #self.train_dataloader = train_dataloader
-        #self.test_dataloader = test_dataloader
 
         # take over whatever gpus are on the system
         self.device = 'cpu'
@@ -76,16 +74,17 @@ class Trainer:
             len_tgts = []
             preds = []
             pbar = tqdm(enumerate(loader), total=len(loader)) if is_train else enumerate(loader)
-            for it, (x, y, len_masks) in pbar:
+            for it, (x, y, len_masks, labels) in pbar:
 
                 # place data on the correct device
                 x = x.to(self.device)
                 y = y.to(self.device)
                 len_masks = len_masks.to(self.device)
+                labels = labels.to(self.device)
 
                 # forward the model
                 with torch.set_grad_enabled(is_train):
-                    logits, loss, pred = model(x, y, len_masks )
+                    logits, loss, pred = model(x, y, len_masks, labels)
                     loss = loss.mean() # collapse all losses if they are scattered on multiple gpus
                     losses.append(loss.item())
                     tgts.append(y)
@@ -134,6 +133,7 @@ class Trainer:
                         eos_ind = tgts[i].index(2319)
                     except:
                         eos_ind = len(tgts[i])-1
+                    
 
                     tgts_list.append(tgts[i][:eos_ind])
                     tgts_list[-1] = [[self.id_2_word[x] for x in tgts_list[-1]]]
@@ -143,15 +143,16 @@ class Trainer:
                         eos_ind = preds[i].index(2319)
                     except:
                         eos_ind = len(preds[i])-1
+
                     preds_list.append(preds[i][:eos_ind])
                     preds_list[-1] = [str(self.id_2_word[x]) for x in preds_list[-1]]
 
                 assert(len(preds_list) == len(tgts_list))
-                #print(preds_list[10])
-                #print(tgts_list[10])
-                test_bleu = bleu_score(preds_list, tgts_list, max_n=1, weights=[1])
+                #print(preds_list[10][:60])
+                #print(tgts_list[10][0][:60])
+                test_bleu = bleu_score(preds_list, tgts_list, max_n=2, weights=[0,1])
             
-                logger.info("test loss: %f \t bleu_score:%f", test_loss,  test_bleu)
+                logger.info("test loss: %f \t bleu_score_2:%f", test_loss,  test_bleu)
 
                 return test_loss, test_bleu
 
@@ -168,8 +169,9 @@ class Trainer:
                 test_loss, test_bleu = run_epoch('test')
 
             # supports early stopping based on the test loss, or just save always if no test set is provided
-            good_model = self.test_dataset is None or test_loss < best_loss or test_bleu >  best_bleu
+            good_model = self.test_dataset is None or test_loss < 1.10*best_loss
             if self.config.ckpt_path is not None and good_model:
-                best_loss = test_loss
+                if test_loss < best_loss:
+                    best_loss = test_loss
                 best_bleu = test_bleu
                 self.save_checkpoint()
