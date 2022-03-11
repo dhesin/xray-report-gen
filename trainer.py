@@ -8,7 +8,7 @@ import torch
 import torch.optim as optim
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data.dataloader import DataLoader
-
+import re
 
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,8 @@ class TrainerConfig:
     # checkpoint settings
     ckpt_path = None
     num_workers = 0 # for DataLoader
+    pretrain = False
+    tokenizer = None
 
     def __init__(self, **kwargs):
         for k,v in kwargs.items():
@@ -70,6 +72,7 @@ class Trainer:
                                 collate_fn = data.collate_fn)
 
             losses = []
+            losses_cont = []
             tgts = []
             len_tgts = []
             preds = []
@@ -85,7 +88,7 @@ class Trainer:
                 # forward the model
                 with torch.set_grad_enabled(is_train):
                     logits, loss, pred = model(x, y, len_masks, labels)
-                    loss = loss.mean() # collapse all losses if they are scattered on multiple gpus
+                    loss = loss.mean() 
                     losses.append(loss.item())
                     tgts.append(y)
                     #len_tgts.append(leny)
@@ -123,36 +126,44 @@ class Trainer:
                 #logger.info("test loss: %f", test_loss)
                 #return test_loss
            
+                test_bleu = 0
+                if not config.pretrain:
+                    tgts = torch.vstack(tgts).cpu().numpy().tolist()
+                    preds = torch.vstack(preds).cpu().numpy().tolist()
+                    tgts_list = []
+                    preds_list = []
+                    for i in range(len(tgts)):
+                        try:
+                            eos_ind = tgts[i].index(self.word_2_id['<eos>'])
+                        except:
+                            eos_ind = len(tgts[i])-1
+                        
 
-                tgts = torch.vstack(tgts).cpu().numpy().tolist()
-                preds = torch.vstack(preds).cpu().numpy().tolist()
-                tgts_list = []
-                preds_list = []
-                for i in range(len(tgts)):
-                    try:
-                        eos_ind = tgts[i].index(2319)
-                    except:
-                        eos_ind = len(tgts[i])-1
-                    
+                        tgts_list.append(tgts[i][:eos_ind])
+                        #tgts_list[-1] = [self.config.tokenizer.decode(tgts_list[-1]).split()]
+                        tgts_list[-1] = [[self.id_2_word[x] for x in tgts_list[-1]]]
+                        #tgts_list[-1] = [[self.config.tokenizer.id_to_token(x) for x in tgts_list[-1]]]
+                        #print(tgts_list[-1])
 
-                    tgts_list.append(tgts[i][:eos_ind])
-                    tgts_list[-1] = [[self.id_2_word[x] for x in tgts_list[-1]]]
+                    for i in range(len(preds)):
+                        try:
+                            eos_ind = preds[i].index(self.word_2_id['<eos>'])
+                        except:
+                            eos_ind = len(preds[i])-1
 
-                for i in range(len(preds)):
-                    try:
-                        eos_ind = preds[i].index(2319)
-                    except:
-                        eos_ind = len(preds[i])-1
+                        preds_list.append(preds[i][:eos_ind])
+                        #preds_list[-1] = self.config.tokenizer.decode(preds_list[-1]).split()
+                        preds_list[-1] = [str(self.id_2_word[x]) for x in preds_list[-1]]
+                        #preds_list[-1] = [self.config.tokenizer.id_to_token(x) for x in preds_list[-1]]
+                        #print(preds_list[-1])
 
-                    preds_list.append(preds[i][:eos_ind])
-                    preds_list[-1] = [str(self.id_2_word[x]) for x in preds_list[-1]]
-
-                assert(len(preds_list) == len(tgts_list))
-                #print(preds_list[10][:60])
-                #print(tgts_list[10][0][:60])
-                test_bleu = bleu_score(preds_list, tgts_list, max_n=2, weights=[0,1])
-            
-                logger.info("test loss: %f \t bleu_score_2:%f", test_loss,  test_bleu)
+                    assert(len(preds_list) == len(tgts_list))
+                    #print(preds_list[10][:60])
+                    #print(tgts_list[10][0][:60])
+                    test_bleu = bleu_score(preds_list, tgts_list, max_n=2, weights=[0,1])
+                    logger.info("bleu_score_2:%f", test_bleu)
+                
+                logger.info("test loss: %f", test_loss)
 
                 return test_loss, test_bleu
 
@@ -169,9 +180,10 @@ class Trainer:
                 test_loss, test_bleu = run_epoch('test')
 
             # supports early stopping based on the test loss, or just save always if no test set is provided
-            good_model = self.test_dataset is None or test_loss < 1.10*best_loss
+            good_model = self.test_dataset is None or test_loss < 1.05*best_loss #or test_bleu > best_bleu
             if self.config.ckpt_path is not None and good_model:
                 if test_loss < best_loss:
                     best_loss = test_loss
-                best_bleu = test_bleu
+                if test_bleu > best_bleu:
+                    best_bleu = test_bleu
                 self.save_checkpoint()

@@ -17,7 +17,7 @@ def top_k_logits(logits, k):
     return out
 
 @torch.no_grad()
-def sample(model, x, y0, label, len_mask, steps):
+def sample(model, x, y0, label, len_mask, steps, word_2_id):
     """
     take a conditioning sequence of indices in x (of shape (b,t)) and predict the next token in
     the sequence, feeding the predictions back into the model each time. Clearly the sampling
@@ -28,29 +28,33 @@ def sample(model, x, y0, label, len_mask, steps):
     model.eval()
     generated = []
  
-    #print("x >>>>>>>>>>:", x)
     y1 = y0
-    reps = model.representation(x, label)
+    y2 = y0
+    reps, _ = model.representation(x, label)
     #print(reps)
 
     for k in range(steps):
         
-        #print("****************", y0)
-        logits, _, pred = model.decode(reps, y0, None)
-        #logits, _, pred = model(x, y0, None, label)
-        
-        #for j in range(len(y0[0])):
-        #    y2 = torch.argmax(logits[:, j, :], dim=1)
-        #    print("&&&&&&&&&&&&&&&&", y2)
+        logits, _, pred = model.decode(reps, y0, None, label)
 
-
-        logits = logits[:, len(y0)-1, :]
+        #logits = logits[:,0,:]
+        #print("logits shape:", logits.shape)
+        #print("input shape:", y0.shape)
+        assert(logits.shape[1] == y0.shape[1])
+        logits = logits[:,-1,:]
 
         
         #logits[:, y1] = float('-inf')
+        #logits[:, y2] = float('-inf')
+
+
+        y2 = y1
         y1 = torch.argmax(logits,dim=1).unsqueeze(0)
-        #print(y1.item())
         generated.append(y1.item())
+
+        #if y1.item() == word_2_id['<eos>']:
+        #    break;
+
         #print("y0 shape:", y0.shape)
         #print("y1 shape:", y1.shape)
         y0 = torch.cat((y0, y1), dim=1)
