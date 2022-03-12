@@ -9,44 +9,7 @@ import torch
 import torchvision
 from torchvision import transforms
 
-
-TRAIN_SIZE = 0.9
-SEQUENCE_LEN = 1500
-
 def generate_vocabulary(df):
-
-    df = df.fillna('')
-    
-    words = []
-    for (report, finding) in zip(df.impression, df.findings):
-        rp = re.findall(r"[\w']+|[.,!?;]", report)
-        fg = re.findall(r"[\w']+|[.,!?;]", finding)
-        words.append(rp)
-        words.append(fg)
-        #words.append(str.split(report))
-
-    vocab = [x for sublist in words for x in sublist]
-
-    vocab = sorted(np.unique(vocab))
-
-    word_2_id = {}
-    id_2_word = {}
-    for ind, word in enumerate(vocab):
-        word_2_id[str(word)] = ind
-        id_2_word[ind] = word
-
-    vocab_size = len(vocab)
-    word_2_id['<eos>'] = vocab_size
-    id_2_word[vocab_size] = '<eos>'
-    word_2_id['<start>'] = vocab_size+1
-    id_2_word[vocab_size+1] = '<start>'
-
-    #print(word_2_id)
-    #print(id_2_word)
-    print("len vocab:", len(vocab))
-    return word_2_id, id_2_word
-
-def generate_vocabulary_mimic(df):
 
     df = df.fillna('')
 
@@ -56,8 +19,6 @@ def generate_vocabulary_mimic(df):
         words.append(rp)
 
     vocab = [x for sublist in words for x in sublist]
-    #vocab = [x[:7] for x in vocab]
-
     vocab = sorted(np.unique(vocab))
 
     word_2_id = {}
@@ -77,11 +38,11 @@ def generate_vocabulary_mimic(df):
     return word_2_id, id_2_word
 
 
-def get_train_val_df(df):
+def get_train_val_df(df, train_size):
   """
     Separates the dataframe into training and validation sets. Splits by subject id.
   """
-  train_split = TRAIN_SIZE
+  train_split = train_size
   ids = df.id.unique()
   np.random.seed(1)
   train_uids = np.random.choice(ids, size = int(len(ids)*train_split), replace = False)
@@ -112,7 +73,7 @@ class chestXRayDataset(Dataset):
 
         if len(self.img_labels) > 0:
             self.img_labels = self.img_labels.fillna(2)
-            self.img_labels = self.img_labels + 1
+            #self.img_labels = self.img_labels + 1
             self.num_labels = len(self.img_labels.columns)
             self.img_labels = self.img_labels.to_numpy()
 
@@ -161,7 +122,7 @@ class chestXRayDataset(Dataset):
         report = self.report[idx]
         len_mask = [False if i < self.report_len[idx] else True for i in range(self.block_size)]
 
-        labels = self.img_labels[idx].tolist()
+        labels = self.img_labels[idx]
         #labels = [0,0,0,0,0,0,0,0,0,0,0,0,0,0 ]
 
         return image, torch.LongTensor(report), torch.BoolTensor(len_mask), torch.IntTensor(labels)

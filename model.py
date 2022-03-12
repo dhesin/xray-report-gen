@@ -101,9 +101,9 @@ class ImageEncoderReportDecoder(nn.Module):
     def representation(self, x, labels):
 
         x_org = x
-        if labels != None:
-            label_emb = self.label_emb(labels)
-            label_emb = label_emb + self.pos_emb_labels
+        #if labels != None:
+        #    label_emb = self.label_emb(labels)
+        #    label_emb = label_emb + self.pos_emb_labels
 
         if self.img_enc_name == "ResNet18" or self.img_enc_name == "UNet":
             x = torch.cat((x.unsqueeze(1),x.unsqueeze(1),x.unsqueeze(1)), dim=1)
@@ -132,7 +132,7 @@ class ImageEncoderReportDecoder(nn.Module):
         x = x + self.pos_emb[:, :t,:]
         x = self.drop(x)
         
-        x = torch.cat((x, label_emb), dim=1)
+        #x = torch.cat((x, label_emb), dim=1)
 
         reps = self.transformer_encoder(x)
 
@@ -219,15 +219,4 @@ class ImageEncoderReportDecoder(nn.Module):
             print("Nothing to contrast in batch")
 
         return loss.to('cuda')
-
-
-    def load_pretrained_encoder(self, model_name):
-
-        state_dict = torch.load(model_name)
-
-        self.pos_emb_labels = torch.nn.Parameter(state_dict['pos_emb_labels'])
-        self.label_emb.load_state_dict(state_dict, strict=False)
-        self.pos_emb = torch.nn.Parameter(state_dict['pos_emb'])
-        #encoder_layer.load_state_dict(state_dict, strict=False)
-        self.transformer_encoder.load_state_dict(state_dict, strict=False)
 

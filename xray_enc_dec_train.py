@@ -7,7 +7,7 @@ from dataset import chestXRayDataset
 from torch.utils.data import Dataset,  DataLoader
 import logging
 from utils import set_seed
-from mymodel import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
+from model import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
 from trainer import Trainer, TrainerConfig
 #import torchxrayvision as xrv
 import argparse
@@ -61,8 +61,8 @@ img_enc_direct.output_shape = (224, 224)
 
 
 # Select one of the above
-img_enc_name = "UNet" # "UNet" # "ResNetAE" "Direct"
-img_enc = img_enc_unet
+img_enc_name = "ResNet18" # "UNet" # "ResNetAE" "Direct" "ResNet18"
+img_enc = img_enc_resnet
 img_enc_width, img_enc_height = img_enc.input_shape
 img_enc_out_shape = img_enc.output_shape
 block_size = img_enc_out_shape[0]
@@ -114,7 +114,7 @@ def parse_args():
     parser.add_argument('--pretrain', action='store_true')
     parser.add_argument('--pretrained_encoder', type=str, default='./pretrained_encoder.pth')
     parser.add_argument('--train_decoder', action='store_true')
-    parser.add_argument('--out_model_name', type=str, default='./xray_model_lr3-3.pth', help='output model name')
+    parser.add_argument('--out_model_name', type=str, default='./xray_model_lr1-3.pth', help='output model name')
     parser.add_argument('--batch_size', type=int, default=16, help='')
     parser.add_argument('--embed_size', type=int, default=720, help='')
 

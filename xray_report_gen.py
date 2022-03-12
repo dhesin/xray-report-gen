@@ -7,13 +7,14 @@ import pickle
 from torch.utils.data import Dataset,  DataLoader
 import logging
 from utils import set_seed, sample
-from mymodel import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
+from model import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
 from trainer import Trainer, TrainerConfig
 from torchtext.data.metrics import bleu_score
 from tqdm import tqdm
 #import torchxrayvision as xrv
 from tokenizers import BertWordPieceTokenizer
 import re
+import os
 
 logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
@@ -61,8 +62,8 @@ img_enc_direct.output_shape = (224, 224)
 
 
 # Select one of the above
-img_enc_name = "UNet" # "UNet" # "ResNetAE" "Direct"
-img_enc = img_enc_unet
+img_enc_name = "ResNet18" # "UNet" # "ResNetAE" "Direct"
+img_enc = img_enc_resnet
 img_enc_width, img_enc_height = img_enc.input_shape
 img_enc_out_shape = img_enc.output_shape
 block_size = img_enc_out_shape[0]
@@ -95,8 +96,9 @@ with open("./db_datasets.pkl", "rb") as cache:
 #tokenizer = BertWordPieceTokenizer("bert-vocab.txt")
 #print(tokenizer)
 #vocab_size = tokenizer.get_vocab_size()
-#print("vocabulary size:", vocab_size)
 tokenizer = None
+
+print("vocabulary size:", vocab_size)
 
 ##################################
 # generate train/validation sets
@@ -112,14 +114,13 @@ print(f'There are {len(train_dataset) :,} samples for training, and {len(val_dat
 torch.set_default_dtype(torch.float64)
 mconf = ImageEncoderReportDecoderConfig(vocab_size, block_size, n_embd=720, pretrain=False, train_decoder=False, pretrained_encoder_model=None)
 model = ImageEncoderReportDecoder(mconf, img_enc, img_enc_out_shape, img_enc_name).float()
-model.load_state_dict(torch.load("./xray_model_lr3-3.pth"))
-#model.img_enc = torch.hub.load('mateuszbuda/brain-segmentation-pytorch', 'unet', in_channels=3, out_channels=1, init_features=32, pretrained=True)
+model.load_state_dict(torch.load("./xray_model_lr1-3.pth"))
 
 
 
 tgts = []
 preds = []
-
+labels = []
 
 print("len val dataset:", len(val_dataset))
 pbar = tqdm(enumerate(val_dataset)) 
@@ -136,8 +137,7 @@ for it, (x, y, _, label) in pbar:
     y = [item.item() for sublist in y[0] for item in sublist]
     tgts.append(torch.IntTensor(y))
     preds.append(torch.IntTensor(gen))
-    #print(y)
-    #print(ttt)
+    labels.append(label)
 
     gen_text = [id_2_word[k]  if  k != word_2_id['<eos>'] else '' for k in gen]
     #zz = [tokenizer.id_to_token(k)  if  k != 3 else '' for k in gen]
@@ -150,6 +150,8 @@ for it, (x, y, _, label) in pbar:
 
 tgts = torch.vstack(tgts).cpu().numpy().tolist()
 preds = torch.vstack(preds).cpu().numpy().tolist()
+labels = torch.vstack(labels).cpu().numpy().tolist()
+
 tgts_list = []
 preds_list = []
 for i in range(len(tgts)):
@@ -160,7 +162,7 @@ for i in range(len(tgts)):
 
     tgts_list.append(tgts[i][:eos_ind])
     #tgts_list[-1] = [tokenizer.decode(tgts_list[-1]).split()]
-    tgts_list[-1] = [[id_2_word[x] for x in tgts_list[-1]]]
+    tgts_list[-1] = [[id_2_word[x] for x in tgts_list[-1][1:]]]
 
 for i in range(len(preds)):
     try:
@@ -181,3 +183,24 @@ test_bleu_3 = bleu_score(preds_list, tgts_list, max_n=3, weights=[0,0,1])
 test_bleu_4 = bleu_score(preds_list, tgts_list, max_n=4, weights=[0,0,0,1])
 test_bleu_5 = bleu_score(preds_list, tgts_list, max_n=5, weights=[0,0,0,0,1])
 print(f"Bleu Scores:1:{test_bleu_1} \t 2:{test_bleu_2} \t 3:{test_bleu_3} \t 4:{test_bleu_4} \t 5:{test_bleu_5}")
+
+
+tgts_list = [' '.join(x[0]) for x in tgts_list]
+preds_list = [' '.join(x) for x in preds_list]
+
+df_target_labels = pd.DataFrame(labels, columns=['No Finding','Enlarged Cardiomediastinum','Cardiomegaly','Lung Lesion', \
+                              'Lung Opacity','Edema','Consolidation','Pneumonia','Atelectasis',\
+                              'Pneumothorax','Pleural Effusion','Pleural Other','Fracture','Support Devices']).reset_index()
+
+
+
+df = pd.DataFrame({"report":tgts_list, "preds":preds_list}).reset_index()
+assert(len(df) == len(df_target_labels))
+
+df_merged = df.merge(df_target_labels, how='inner', left_index=True, right_index=True)
+assert(len(df) == len(df_target_labels))
+
+df = df_merged
+df.to_csv("./reports_preds_generated.csv", index=False)
+df.preds.to_csv("./preds_only_generated.csv", index=False, header=None)
+

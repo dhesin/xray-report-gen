@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pickle
-from dataset import get_train_val_df, generate_vocabulary, generate_vocabulary_mimic
+from dataset import get_train_val_df, generate_vocabulary
 import logging
 from utils import set_seed
 import os
@@ -9,6 +9,9 @@ import os
 set_seed(42)
 data_path = "/home/desin/CS224N/data/chestXray/"
 data_path_mimic = "/home/desin/CS224N/data/mimic_cxr/"
+
+
+TRAIN_SIZE = 0.8
 
 #################################
 # generate vocabulary
@@ -34,7 +37,7 @@ df['report'] = df['report'].apply(lambda x: x.replace('\n',' '))
 df.to_csv("ui_reports.csv")
 
 
-word_2_id, id_2_word = generate_vocabulary_mimic(df)
+word_2_id, id_2_word = generate_vocabulary(df)
 vocab_size = len(word_2_id)
 assert(len(id_2_word) == len(word_2_id))
 print(word_2_id)
@@ -46,7 +49,7 @@ print("vocabulary size mimic and ui:", len(id_2_word))
 # generate train/validation sets
 #################################
 #df = pd.read_csv(data_path+"uid_report_projection_label.csv")
-train_df, val_df = get_train_val_df(df)
+train_df, val_df = get_train_val_df(df, TRAIN_SIZE)
 print(f'There are {len(train_df) :,} samples for training, and {len(val_df) :,} samples for validation testing')
 
 db_vocab = {"word_2_id":word_2_id, "id_2_word":id_2_word}
