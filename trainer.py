@@ -123,8 +123,6 @@ class Trainer:
 
             if not is_train:
                 test_loss = float(np.mean(losses))
-                #logger.info("test loss: %f", test_loss)
-                #return test_loss
            
                 test_bleu = 0
                 if not config.pretrain:
@@ -166,7 +164,8 @@ class Trainer:
                 logger.info("test loss: %f", test_loss)
 
                 return test_loss, test_bleu
-
+            
+            return float(np.mean(losses)), None
 
         best_loss = float('inf')
         best_bleu = float('-inf')
@@ -175,12 +174,14 @@ class Trainer:
         
         for epoch in range(config.max_epochs):
 
-            run_epoch('train')
+            train_loss, _ = run_epoch('train')
             if self.test_dataset is not None:
                 test_loss, test_bleu = run_epoch('test')
 
+            print("Train: ", train_loss, "Test: ", test_loss)
+            
             # supports early stopping based on the test loss, or just save always if no test set is provided
-            good_model = self.test_dataset is None or test_loss < 1.05*best_loss #or test_bleu > best_bleu
+            good_model = self.test_dataset is None or test_loss < 1.05*best_loss or test_bleu > best_bleu
             if self.config.ckpt_path is not None and good_model:
                 if test_loss < best_loss:
                     best_loss = test_loss

@@ -7,9 +7,12 @@ from dataset import chestXRayDataset
 from torch.utils.data import Dataset,  DataLoader
 import logging
 from utils import set_seed
-from model import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
+from mymodel import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
 from trainer import Trainer, TrainerConfig
-#import torchxrayvision as xrv
+#from torchxrayvision.models import DenseNet  as xrvDenseNet
+#from torchxrayvision.baseline_models.chexpert import DenseNet as xrvDenseNet
+#from torchxrayvision.baseline_models.jfhealthcare import DenseNet as xrvDenseNet
+
 import argparse
 from tokenizers import BertWordPieceTokenizer
 
@@ -39,10 +42,8 @@ img_enc_unet = torch.hub.load('mateuszbuda/brain-segmentation-pytorch', 'unet', 
 img_enc_unet.input_shape = (256, 256)
 img_enc_unet.output_shape = (256, 256)
 
-# DenseNet with all images; couldn't make it work
-#img_enc_dense_all = xrv.models.DenseNet(weights="densenet121-res224-all")
-#img_enc_dense_all.classifier = torch.nn.Identity()
-#img_enc_dense_all.upsample = torch.nn.Identity()
+# DenseNet with all images
+img_labeler_all = None
 
 # DenseNet with Chexpert images; couldn't make it work
 #img_enc_dense_chex = xrv.models.DenseNet(weights="densenet121-res224-chex")
@@ -61,8 +62,8 @@ img_enc_direct.output_shape = (224, 224)
 
 
 # Select one of the above
-img_enc_name = "ResNet18" # "UNet" # "ResNetAE" "Direct" "ResNet18"
-img_enc = img_enc_resnet
+img_enc_name =  "UNet" # "ResNetAE" "Direct" "ResNet18"
+img_enc = img_enc_unet
 img_enc_width, img_enc_height = img_enc.input_shape
 img_enc_out_shape = img_enc.output_shape
 block_size = img_enc_out_shape[0]

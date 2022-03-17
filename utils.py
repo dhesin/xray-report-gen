@@ -30,7 +30,7 @@ def sample(model, x, y0, label, len_mask, steps, word_2_id):
  
     y1 = y0
     y2 = y0
-    reps, _ = model.representation(x, label)
+    reps = model.representation(x, label)
     #print(reps)
 
     for k in range(steps):

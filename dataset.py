@@ -73,7 +73,7 @@ class chestXRayDataset(Dataset):
 
         if len(self.img_labels) > 0:
             self.img_labels = self.img_labels.fillna(2)
-            #self.img_labels = self.img_labels + 1
+            self.img_labels = self.img_labels + 1
             self.num_labels = len(self.img_labels.columns)
             self.img_labels = self.img_labels.to_numpy()
 

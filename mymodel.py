@@ -85,7 +85,7 @@ class ImageEncoderReportDecoder(nn.Module):
         prediction = None
 
         
-        reps, loss = self.representation(x, labels)
+        reps = self.representation(x, labels)
         logit, loss, prediction = self.decode(reps, targets, len_mask, labels)
 
         return logit, loss, prediction
@@ -101,9 +101,10 @@ class ImageEncoderReportDecoder(nn.Module):
     def representation(self, x, labels):
 
         x_org = x
-        #if labels != None:
-        #    label_emb = self.label_emb(labels)
-        #    label_emb = label_emb + self.pos_emb_labels
+
+        if labels != None:
+            label_emb = self.label_emb(labels)
+            label_emb = label_emb + self.pos_emb_labels
 
         if self.img_enc_name == "ResNet18" or self.img_enc_name == "UNet":
             x = torch.cat((x.unsqueeze(1),x.unsqueeze(1),x.unsqueeze(1)), dim=1)
@@ -132,17 +133,13 @@ class ImageEncoderReportDecoder(nn.Module):
         x = x + self.pos_emb[:, :t,:]
         x = self.drop(x)
         
+        # concat labels and image encoder outputs
         #x = torch.cat((x, label_emb), dim=1)
 
         reps = self.transformer_encoder(x)
 
-        cont_loss = None
-        #if self.cnf.pretrain:
-        #    cont_loss = self.contrastive(reps, labels)
-        
-        #print("cont loss:", cont_loss)
         #print("reps shape:", reps)
-        return reps, cont_loss
+        return reps
 
     def decode(self, reps, targets, len_mask, labels):
 
@@ -169,8 +166,8 @@ class ImageEncoderReportDecoder(nn.Module):
             #loss = loss * logits_weights
             #loss = loss.mean()
 
-            #cont_loss = self.contrastive(dec_out, labels)
-            #loss = cont_loss + loss
+            cont_loss = self.contrastive(dec_out, labels)
+            loss = cont_loss + loss
 
         prediction = torch.argmax(logits,dim=-1)
         return logits, loss, prediction
@@ -179,7 +176,8 @@ class ImageEncoderReportDecoder(nn.Module):
 
         one_hot_labels = torch.vstack([F.one_hot(labels[i].long(), 4).unsqueeze(0) for i in range(labels.shape[0])])
         #print(one_hot_labels.shape)
-        one_hot_labels = torch.cat((one_hot_labels[:,:,:1],one_hot_labels[:,:,2:3]), dim=2).contiguous().to('cuda')
+        # remove -1:uncertain and 2:no mention types
+        one_hot_labels = one_hot_labels[:,:,1:3].contiguous().to('cuda')
 
         #one_hot_labels = one_hot_labels[:, :, :3].contiguous().to('cuda')
         #print(one_hot_labels)

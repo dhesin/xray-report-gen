@@ -7,7 +7,7 @@ import pickle
 from torch.utils.data import Dataset,  DataLoader
 import logging
 from utils import set_seed, sample
-from model import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
+from mymodel import ImageEncoderReportDecoder, ImageEncoderReportDecoderConfig
 from trainer import Trainer, TrainerConfig
 from torchtext.data.metrics import bleu_score
 from tqdm import tqdm
@@ -62,15 +62,15 @@ img_enc_direct.output_shape = (224, 224)
 
 
 # Select one of the above
-img_enc_name = "ResNet18" # "UNet" # "ResNetAE" "Direct"
-img_enc = img_enc_resnet
+img_enc_name = "UNet" #"ResNet18" # "UNet" # "ResNetAE" "Direct"
+img_enc = img_enc_unet
 img_enc_width, img_enc_height = img_enc.input_shape
 img_enc_out_shape = img_enc.output_shape
 block_size = img_enc_out_shape[0]
 
 
-for name, module in img_enc.named_modules():
-    print(name)
+#for name, module in img_enc.named_modules():
+#    print(name)
 
 #################################
 # load vocabulary and dataframes
